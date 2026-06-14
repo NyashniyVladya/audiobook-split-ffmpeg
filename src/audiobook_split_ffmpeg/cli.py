@@ -16,6 +16,7 @@
 CLI application implementation for audiobook-split-ffmpeg
 """
 
+import os
 import sys
 import shlex
 import argparse
@@ -50,8 +51,15 @@ def parse_args(argv: t.List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         '--outdir',
-        required=True,
+        required=False,
+        default=None,
         help='Output directory. Created if does not exist yet.',
+    )
+    parser.add_argument(
+        '--out-ext',
+        required=False,
+        default=None,
+        help='New file extension. If conversion to another format is required.',
     )
     parser.add_argument(
         '--concurrency',
@@ -113,12 +121,17 @@ def _main(args: argparse.Namespace) -> int:
     if args.verbose:
         print('args:', args)
 
+    outdir = args.outdir
+    if outdir is None:
+        outdir, _ = os.path.splitext(args.infile)
+
     work_items = list(
         compute_workitems(
             args.infile,
-            args.outdir,
+            outdir,
             enumerate_files=args.enumerate_files,
             use_title_in_filenames=args.use_title,
+            out_ext=args.out_ext
         )
     )
     if args.verbose:
@@ -126,7 +139,7 @@ def _main(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         print('# NOTE: dry-run requested')
-        print(shlex.join(['mkdir', '-p', args.outdir]))
+        print(shlex.join(['mkdir', '-p', outdir]))
         commands = (workitem_to_ffmpeg_cmd(wi) for wi in work_items)
         escaped_cmds = (shlex.join(cmd) for cmd in commands)
         for cmd in escaped_cmds:
@@ -135,7 +148,7 @@ def _main(args: argparse.Namespace) -> int:
 
     return process_workitems(
         work_items,
-        args.outdir,
+        outdir,
         args.concurrency,
         args.verbose,
     )
